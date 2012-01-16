@@ -73,16 +73,10 @@ void CompareDescriptorsWidget::on_actionHelp_activated()
   QTextEdit* help=new QTextEdit();
 
   help->setReadOnly(true);
-  help->append("<h1>Image correspondences</h1>\
-  Hold the right mouse button and drag to zoom in and out. <br/>\
-  Hold the middle mouse button and drag to pan the image. <br/>\
-  Click the left mouse button to select a keypoint.<br/> <p/>\
-  <h1>Point cloud correspondences</h1>\
-  Hold the left mouse button and drag to rotate the scene.<br/>\
-  Hold the right mouse button and drag to zoom in and out. Hold the middle mouse button and drag to pan the scene. While holding control (CTRL), click the left mouse button to select a keypoint.<br/>\
-  If you need to zoom in farther, hold shift while left clicking a point to change the camera's focal point to that point. You can reset the focal point by pressing 'r'.\
-  <h1>Saving keypoints</h1>\
-  The same number of keypoints must be selected in both the left and right panels before the points can be saved."
+  help->append("<h1>Compare descriptors</h1>\
+  Load a point cloud <br/>\
+  Ctrl+click to select a point. <br/>\
+  Click Compare.<br/>"
   );
   help->show();
 }
@@ -136,18 +130,18 @@ void CompareDescriptorsWidget::LoadPointCloud(const std::string& fileName)
 //   this->ProgressDialog->setWindowModality(Qt::WindowModal);
 //   this->ProgressDialog->exec();
 
-  this->PointCloud->GetPointData()->SetActiveScalars("Intensity");
-
-  float range[2];
-  vtkFloatArray::SafeDownCast(this->PointCloud->GetPointData()->GetArray("Intensity"))->GetValueRange(range);
-
-  vtkSmartPointer<vtkLookupTable> lookupTable = vtkSmartPointer<vtkLookupTable>::New();
-  lookupTable->SetTableRange(range[0], range[1]);
-  lookupTable->SetHueRange(0, 1);
+//   this->PointCloud->GetPointData()->SetActiveScalars("Intensity");
+// 
+//   float range[2];
+//   vtkFloatArray::SafeDownCast(this->PointCloud->GetPointData()->GetArray("Intensity"))->GetValueRange(range);
+// 
+//   vtkSmartPointer<vtkLookupTable> lookupTable = vtkSmartPointer<vtkLookupTable>::New();
+//   lookupTable->SetTableRange(range[0], range[1]);
+//   lookupTable->SetHueRange(0, 1);
 
   
   this->Pane->PointCloudMapper->SetInputConnection(this->PointCloud->GetProducerPort());
-  this->Pane->PointCloudMapper->SetLookupTable(lookupTable);
+  //this->Pane->PointCloudMapper->SetLookupTable(lookupTable);
   this->Pane->PointCloudActor->SetMapper(this->Pane->PointCloudMapper);
   this->Pane->PointCloudActor->GetProperty()->SetRepresentationToPoints();
 
@@ -206,6 +200,8 @@ void CompareDescriptorsWidget::ComputeDifferences()
     differences->SetValue(pointId, difference);
     }
 
+  this->Pane->PointCloudMapper->GetInput()->GetPointData()->SetScalars(differences);
+  
   float range[2];
   differences->GetValueRange(range);
   vtkSmartPointer<vtkLookupTable> lookupTable = vtkSmartPointer<vtkLookupTable>::New();
@@ -214,10 +210,13 @@ void CompareDescriptorsWidget::ComputeDifferences()
   lookupTable->SetHueRange(0, 1);
 
   this->Pane->PointCloudMapper->SetLookupTable(lookupTable);
-  std::cout << "UseLookupTableScalarRange " << this->Pane->PointCloudMapper->GetUseLookupTableScalarRange() << std::endl;
-  this->Pane->PointCloudMapper->SetUseLookupTableScalarRange(false);
-  
-  this->Pane->PointCloudMapper->GetInput()->GetPointData()->SetScalars(differences);
+  //std::cout << "UseLookupTableScalarRange " << this->Pane->PointCloudMapper->GetUseLookupTableScalarRange() << std::endl;
+  //this->Pane->PointCloudMapper->SetUseLookupTableScalarRange(false);
+
+  // Without this, only a small band of colors is produce around the point.
+  // I'm not sure why the scalar range of the data set is not the same?
+  this->Pane->PointCloudMapper->SetUseLookupTableScalarRange(true);
+
   this->qvtkWidget->GetRenderWindow()->Render();
 
   vtkSmartPointer<vtkXMLPolyDataWriter> writer = vtkSmartPointer<vtkXMLPolyDataWriter>::New();

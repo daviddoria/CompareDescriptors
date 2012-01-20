@@ -32,16 +32,6 @@
 namespace Helpers
 {
 
-float ArrayDifference(float* const array1, float* const array2, const unsigned int length)
-{
-  float totalDifference = 0.0f;
-  for(unsigned int i = 0; i < length; ++i)
-    {
-    totalDifference += fabs(array1[i] - array2[i]);
-    }
-  return totalDifference;
-}
-
 void OutputArrayNames(vtkPolyData* const polyData)
 {
   vtkIdType numberOfPointArrays = polyData->GetPointData()->GetNumberOfArrays();

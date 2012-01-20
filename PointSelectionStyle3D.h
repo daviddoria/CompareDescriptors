@@ -36,8 +36,6 @@ public:
 
   void OnLeftButtonDown() ;
 
-  void SetCurrentRenderer(vtkRenderer* const renderer);
-
   void SetMarkerRadius(const float radius);
 
   double* GetMarkerLocation();
@@ -45,16 +43,9 @@ public:
   vtkPolyData* Points;
 
   vtkIdType SelectedPointId;
-private:
-  //void ChangePoint(double p[3]);
-  void ChangePoint(const vtkIdType pointId);
 
-  vtkSmartPointer<vtkActor> MarkerActor;
-  vtkSmartPointer<vtkPolyDataMapper> MarkerMapper;
-  vtkSmartPointer<vtkSphereSource> MarkerSource;
-
-  float MarkerRadius;
-  
+  int SelectedPointEvent;
+ 
 };
 
 #endif

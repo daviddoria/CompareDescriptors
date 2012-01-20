@@ -29,10 +29,11 @@ void OutputArrayNames(vtkPolyData* const polyData);
 
 float ComputeAverageSpacing(vtkPoints* const points, const unsigned int numberOfPointsToUse);
 
-float ArrayDifference(float* const array1, float* const array2, const unsigned int length);
-
-#include "Helpers.hxx"
+template <typename T>
+float ArrayDifference(T* const array1, T* const array2, const unsigned int length);
 
 }
+
+#include "Helpers.hxx"
 
 #endif

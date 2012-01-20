@@ -29,12 +29,11 @@ int main( int argc, char** argv )
 
   CompareDescriptorsWidget compareDescriptorsWidget;
 
-  if(argc > 1)
+  if(argc == 2)
     {
     std::string fileName = argv[1];
     compareDescriptorsWidget.LoadPointCloud(fileName);
-    std::string nameOfArrayToCompare = argv[2];
-    compareDescriptorsWidget.SetNameOfArrayToCompare(nameOfArrayToCompare);
+    std::cout << "Loaded " << fileName << std::endl;
     }
   compareDescriptorsWidget.show();
 

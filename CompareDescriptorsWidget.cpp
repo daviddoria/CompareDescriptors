@@ -66,7 +66,6 @@
 #include "Helpers.h"
 #include "Types.h"
 #include "PointSelectionStyle3D.h"
-#include "Pane3D.h"
 
 void CompareDescriptorsWidget::on_actionHelp_activated()
 {
@@ -87,14 +86,49 @@ void CompareDescriptorsWidget::on_actionQuit_activated()
 }
 
 // Constructor
-CompareDescriptorsWidget::CompareDescriptorsWidget() : Pane(NULL), ProgressDialog(new QProgressDialog())
+CompareDescriptorsWidget::CompareDescriptorsWidget() : MarkerRadius(.05)
 {
+  this->ProgressDialog = new QProgressDialog();
   SharedConstructor();
 };
 
 void CompareDescriptorsWidget::SharedConstructor()
 {
   this->setupUi(this);
+
+  this->PointPicker = vtkSmartPointer<vtkPointPicker>::New();
+  this->PointPicker->PickFromListOn();
+
+  // Point cloud
+  this->PointCloud = vtkSmartPointer<vtkPolyData>::New();
+
+  this->PointCloudMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
+  this->PointCloudMapper->SetInputConnection(this->PointCloud->GetProducerPort());
+
+  this->PointCloudActor = vtkSmartPointer<vtkActor>::New();
+  this->PointCloudActor->SetMapper(this->PointCloudMapper);
+
+  // Marker
+  this->MarkerSource = vtkSmartPointer<vtkSphereSource>::New();
+  this->MarkerSource->SetRadius(this->MarkerRadius);
+  this->MarkerSource->Update();
+
+  this->MarkerMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
+  this->MarkerMapper->SetInputConnection(this->MarkerSource->GetOutputPort());
+
+  this->MarkerActor = vtkSmartPointer<vtkActor>::New();
+  this->MarkerActor->SetMapper(this->MarkerMapper);
+
+  // Renderer
+  this->Renderer = vtkSmartPointer<vtkRenderer>::New();
+  this->Renderer->AddActor(this->PointCloudActor);
+  this->Renderer->AddActor(this->MarkerActor);
+
+  this->SelectionStyle = PointSelectionStyle3D::New();
+  this->SelectionStyle->AddObserver(this->SelectionStyle->SelectedPointEvent, this, &CompareDescriptorsWidget::SelectedPointCallback);
+
+  // Qt things
+  this->qvtkWidget->GetRenderWindow()->AddRenderer(this->Renderer);
 
   connect(&this->FutureWatcher, SIGNAL(finished()), this->ProgressDialog , SLOT(cancel()));
 
@@ -105,22 +139,32 @@ void CompareDescriptorsWidget::SharedConstructor()
   this->toolBar_left->addAction(actionOpenPointCloud);
 }
 
+void CompareDescriptorsWidget::SelectedPointCallback(vtkObject* caller, long unsigned int eventId, void* callData)
+{
+  double p[3];
+  this->PointCloud->GetPoint(this->SelectionStyle->SelectedPointId, p);
+  this->MarkerActor->SetPosition(p);
+}
+
+void CompareDescriptorsWidget::Refresh()
+{
+  this->qvtkWidget->GetRenderWindow()->Render();
+}
+
+// void CompareDescriptorsWidget::on_cmbArrayName_activated(int value)
+// {
+//   this->NameOfArrayToCompare = this->comboBox->currentText().toStdString();
+// }
+
 void CompareDescriptorsWidget::LoadPointCloud(const std::string& fileName)
 {
-  if(this->Pane)
-    {
-    delete this->Pane;
-    }
-  this->Pane = new Pane3D(this->qvtkWidget);
-
   vtkSmartPointer<vtkXMLPolyDataReader> reader = vtkSmartPointer<vtkXMLPolyDataReader>::New();
   reader->SetFileName(fileName.c_str());
 
   reader->Update();
 
-  this->PointCloud = vtkSmartPointer<vtkPolyData>::New();
   this->PointCloud->DeepCopy(reader->GetOutput());
-  
+
   // Start the computation.
 //   QFuture<void> future = QtConcurrent::run(reader.GetPointer(), static_cast<void(vtkXMLPolyDataReader::*)()>(&vtkXMLPolyDataReader::Update));
 //   this->FutureWatcher.setFuture(future);
@@ -130,37 +174,34 @@ void CompareDescriptorsWidget::LoadPointCloud(const std::string& fileName)
 //   this->ProgressDialog->setWindowModality(Qt::WindowModal);
 //   this->ProgressDialog->exec();
 
-//   this->PointCloud->GetPointData()->SetActiveScalars("Intensity");
-// 
-//   float range[2];
-//   vtkFloatArray::SafeDownCast(this->PointCloud->GetPointData()->GetArray("Intensity"))->GetValueRange(range);
-// 
-//   vtkSmartPointer<vtkLookupTable> lookupTable = vtkSmartPointer<vtkLookupTable>::New();
-//   lookupTable->SetTableRange(range[0], range[1]);
-//   lookupTable->SetHueRange(0, 1);
+  this->PointCloudMapper->SetInputConnection(this->PointCloud->GetProducerPort());
 
-  
-  this->Pane->PointCloudMapper->SetInputConnection(this->PointCloud->GetProducerPort());
-  //this->Pane->PointCloudMapper->SetLookupTable(lookupTable);
-  this->Pane->PointCloudActor->SetMapper(this->Pane->PointCloudMapper);
-  this->Pane->PointCloudActor->GetProperty()->SetRepresentationToPoints();
+  this->PointCloudActor->GetProperty()->SetRepresentationToPoints();
 
-  // Add Actor to renderer
-  this->Pane->Renderer->AddActor(this->Pane->PointCloudActor);
-  this->Pane->Renderer->ResetCamera();
+  this->Renderer->ResetCamera();
 
-  vtkSmartPointer<vtkPointPicker> pointPicker = vtkSmartPointer<vtkPointPicker>::New();
+  this->PointPicker->AddPickList(this->PointCloudActor);
 
-  pointPicker->PickFromListOn();
-  pointPicker->AddPickList(this->Pane->PointCloudActor);
-  this->Pane->qvtkWidget->GetRenderWindow()->GetInteractor()->SetPicker(pointPicker);
-  this->Pane->SelectionStyle = PointSelectionStyle3D::New();
-  this->Pane->SelectionStyle->Points = this->PointCloud;
-  this->Pane->SelectionStyle->SetCurrentRenderer(this->Pane->Renderer);
-  this->Pane->qvtkWidget->GetRenderWindow()->GetInteractor()->SetInteractorStyle(static_cast<PointSelectionStyle3D*>(this->Pane->SelectionStyle));
+  this->qvtkWidget->GetRenderWindow()->GetInteractor()->SetPicker(this->PointPicker);
+  this->SelectionStyle->Points = this->PointCloud;
+  this->SelectionStyle->SetCurrentRenderer(this->Renderer);
+  this->qvtkWidget->GetRenderWindow()->GetInteractor()->SetInteractorStyle(this->SelectionStyle);
 
-  this->Pane->Renderer->ResetCamera();
+  this->Renderer->ResetCamera();
 
+  PopulateArrayNames(this->PointCloud);
+}
+
+void CompareDescriptorsWidget::PopulateArrayNames(vtkPolyData* const polyData)
+{
+  this->cmbArrayName->clear();
+  vtkIdType numberOfPointArrays = polyData->GetPointData()->GetNumberOfArrays();
+
+  for(vtkIdType i = 0; i < numberOfPointArrays; i++)
+    {
+    std::string arrayName = polyData->GetPointData()->GetArrayName(i);
+    this->cmbArrayName->addItem(arrayName.c_str());
+    }
 }
 
 void CompareDescriptorsWidget::on_btnCompute_clicked()
@@ -170,38 +211,51 @@ void CompareDescriptorsWidget::on_btnCompute_clicked()
 
 void CompareDescriptorsWidget::ComputeDifferences()
 {
-  vtkIdType numberOfPoints = this->Pane->PointCloudMapper->GetInput()->GetNumberOfPoints();
+  vtkIdType numberOfPoints = this->PointCloud->GetNumberOfPoints();
   std::cout << "There are " << numberOfPoints << " points." << std::endl;
 
-  vtkIdType selectedPointId = this->Pane->SelectionStyle->SelectedPointId;
+  vtkIdType selectedPointId = this->SelectionStyle->SelectedPointId;
   std::cout << "selectedPointId: " << selectedPointId << std::endl;
 
-  vtkFloatArray* descriptorArray = vtkFloatArray::SafeDownCast(this->Pane->PointCloudMapper->GetInput()->GetPointData()->GetArray(this->NameOfArrayToCompare.c_str()));
+  if(selectedPointId < 0 || selectedPointId >= numberOfPoints)
+    {
+    std::cerr << "You must select a point to compare!" << std::endl;
+    return;
+    }
+
+  std::cout << "Point cloud address: " << this->PointCloud << std::endl;
+  std::cout << "Number of arrays: " << this->PointCloud->GetPointData()->GetNumberOfArrays() << std::endl;
+  
+  std::string nameOfArrayToCompare = this->cmbArrayName->currentText().toStdString();
+  std::cout << "nameOfArrayToCompare: " << nameOfArrayToCompare << std::endl;
+  vtkDataArray* descriptorArray = this->PointCloud->GetPointData()->GetArray(nameOfArrayToCompare.c_str());
 
   if(!descriptorArray)
     {
-    std::cerr << "Array " << this->NameOfArrayToCompare << " not found!" << std::endl;
-    Helpers::OutputArrayNames(this->Pane->PointCloudMapper->GetInput());
-    return;
+    std::string errorString = "Array " + nameOfArrayToCompare + " not found!";
+    throw std::runtime_error(errorString); // The array should always be found because we are selecting it from a list of available arrays!
     }
-  float selectedDescriptor[descriptorArray->GetNumberOfComponents()];
-  descriptorArray->GetTupleValue(selectedPointId, selectedDescriptor);
+
+  double* selectedDescriptor = new double[descriptorArray->GetNumberOfComponents()];
+  descriptorArray->GetTuple(selectedPointId, selectedDescriptor);
+  std::cout << "selectedDescriptor: " << selectedDescriptor[0] << " " << selectedDescriptor[1] << std::endl;
 
   vtkSmartPointer<vtkFloatArray> differences = vtkSmartPointer<vtkFloatArray>::New();
   differences->SetName("DescriptorDifferences");
   differences->SetNumberOfComponents(1);
   differences->SetNumberOfTuples(numberOfPoints);
 
-  for(vtkIdType pointId = 0; pointId < this->Pane->PointCloudMapper->GetInput()->GetNumberOfPoints(); ++pointId)
+  for(vtkIdType pointId = 0; pointId < this->PointCloud->GetNumberOfPoints(); ++pointId)
     {
-    float currentDescriptor[descriptorArray->GetNumberOfComponents()];
-    descriptorArray->GetTupleValue(pointId, currentDescriptor);
+    double* currentDescriptor = descriptorArray->GetTuple(pointId);
+    //std::cout << "descriptor " << pointId << " : " << currentDescriptor[0] << " " << currentDescriptor[1] << std::endl;
     float difference = Helpers::ArrayDifference(selectedDescriptor, currentDescriptor, descriptorArray->GetNumberOfComponents());
     differences->SetValue(pointId, difference);
     }
 
-  this->Pane->PointCloudMapper->GetInput()->GetPointData()->SetScalars(differences);
-  
+  this->PointCloud->GetPointData()->AddArray(differences);
+  this->PointCloud->GetPointData()->SetActiveScalars("DescriptorDifferences");
+
   float range[2];
   differences->GetValueRange(range);
   vtkSmartPointer<vtkLookupTable> lookupTable = vtkSmartPointer<vtkLookupTable>::New();
@@ -209,37 +263,16 @@ void CompareDescriptorsWidget::ComputeDifferences()
   lookupTable->SetTableRange(range[0], range[1]);
   lookupTable->SetHueRange(0, 1);
 
-  this->Pane->PointCloudMapper->SetLookupTable(lookupTable);
+  this->PointCloudMapper->SetLookupTable(lookupTable);
   //std::cout << "UseLookupTableScalarRange " << this->Pane->PointCloudMapper->GetUseLookupTableScalarRange() << std::endl;
   //this->Pane->PointCloudMapper->SetUseLookupTableScalarRange(false);
 
   // Without this, only a small band of colors is produce around the point.
   // I'm not sure why the scalar range of the data set is not the same?
-  this->Pane->PointCloudMapper->SetUseLookupTableScalarRange(true);
+  this->PointCloudMapper->SetUseLookupTableScalarRange(true);
 
   this->qvtkWidget->GetRenderWindow()->Render();
-
-  vtkSmartPointer<vtkXMLPolyDataWriter> writer = vtkSmartPointer<vtkXMLPolyDataWriter>::New();
-  writer->SetInputConnection(this->Pane->PointCloudMapper->GetInput()->GetProducerPort());
-  writer->SetFileName("Debug.vtp");
-  writer->Write();
-}
-
-void CompareDescriptorsWidget::SetNameOfArrayToCompare(const std::string& nameOfArrayToCompare)
-{
-  this->NameOfArrayToCompare = nameOfArrayToCompare;
-}
-
-std::string CompareDescriptorsWidget::SelectArray(vtkPolyData* const polyData)
-{
-  vtkIdType numberOfPointArrays = polyData->GetPointData()->GetNumberOfArrays();
-
-  for(vtkIdType i = 0; i < numberOfPointArrays; i++)
-    {
-    //polyData->GetPointData()->GetArrayName(i);
-    }
-
-  this->NameOfArrayToCompare = polyData->GetPointData()->GetArrayName(0);
+  //PopulateArrayNames(this->PointCloud);
 }
 
 void CompareDescriptorsWidget::on_actionOpenPointCloud_activated()

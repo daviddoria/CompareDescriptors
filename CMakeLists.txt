@@ -20,7 +20,6 @@ ADD_EXECUTABLE(CompareDescriptors
 CompareDescriptors.cpp
 CompareDescriptorsWidget.cpp
 Helpers.cpp
-Pane3D.cpp
 PointSelectionStyle3D.cpp
 ${UISrcs} ${MOCSrcs} ${ResourceSrcs})
 TARGET_LINK_LIBRARIES(CompareDescriptors QVTK ${VTK_LIBRARIES} ${ITK_LIBRARIES})

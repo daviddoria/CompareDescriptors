@@ -34,7 +34,6 @@
 class QProgressDialog;
 
 // Custom
-#include "Pane3D.h"
 #include "PointSelectionStyle3D.h"
 #include "Types.h"
 
@@ -43,6 +42,7 @@ class vtkActor;
 class vtkBorderWidget;
 class vtkImageData;
 class vtkImageActor;
+class vtkPointPicker;
 class vtkPolyData;
 class vtkPolyDataMapper;
 class vtkRenderer;
@@ -58,7 +58,7 @@ public:
   ~CompareDescriptorsWidget() {};
 
   void LoadPointCloud(const std::string& fileName);
-  void SetNameOfArrayToCompare(const std::string& nameOfArrayToCompare);
+
   void ComputeDifferences();
 
 public slots:
@@ -68,10 +68,9 @@ public slots:
   void on_actionHelp_activated();
   void on_actionQuit_activated();
 
-
 private:
 
-  std::string SelectArray(vtkPolyData* const polyData);
+  void PopulateArrayNames(vtkPolyData* const polyData);
 
   vtkSmartPointer<vtkPolyData> PointCloud;
 
@@ -79,9 +78,24 @@ private:
   QFutureWatcher<void> FutureWatcher;
   QProgressDialog* ProgressDialog;
 
-  Pane3D* Pane;
+  vtkSmartPointer<vtkPointPicker> PointPicker;
 
-  std::string NameOfArrayToCompare;
+  vtkSmartPointer<vtkRenderer> Renderer;
+
+  vtkSmartPointer<PointSelectionStyle3D> SelectionStyle;
+
+  void Refresh();
+
+  vtkSmartPointer<vtkActor> PointCloudActor;
+  vtkSmartPointer<vtkPolyDataMapper> PointCloudMapper;
+
+  vtkSmartPointer<vtkActor> MarkerActor;
+  vtkSmartPointer<vtkPolyDataMapper> MarkerMapper;
+  vtkSmartPointer<vtkSphereSource> MarkerSource;
+
+  float MarkerRadius;
+
+  void SelectedPointCallback(vtkObject* caller, long unsigned int eventId, void* callData);
 };
 
 #endif

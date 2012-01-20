@@ -21,6 +21,7 @@
 // VTK
 #include <vtkAbstractPicker.h>
 #include <vtkCamera.h>
+#include <vtkCommand.h>
 #include <vtkObjectFactory.h>
 #include <vtkPointPicker.h>
 #include <vtkPolyDataMapper.h>
@@ -39,29 +40,9 @@
 
 vtkStandardNewMacro(PointSelectionStyle3D);
 
-PointSelectionStyle3D::PointSelectionStyle3D()
+PointSelectionStyle3D::PointSelectionStyle3D() : SelectedPointId(-1), SelectedPointEvent(vtkCommand::UserEvent + 1)
 {
-  this->MarkerRadius = .05;
-  
-  // Create a sphere to use as the dot
-  this->MarkerSource = vtkSmartPointer<vtkSphereSource>::New();
-  this->MarkerSource->SetRadius(this->MarkerRadius);
-  this->MarkerSource->Update();
 
-  this->MarkerMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
-  this->MarkerMapper->SetInputConnection(this->MarkerSource->GetOutputPort());
-
-  this->MarkerActor = vtkSmartPointer<vtkActor>::New();
-  this->MarkerActor->SetMapper(this->MarkerMapper);
-
-  vtkSmartPointer<vtkActor> MarkerActor;
-  vtkSmartPointer<vtkPolyDataMapper> MarkerMapper;
-  vtkSmartPointer<vtkSphereSource> MarkerSource;
-}
-
-void PointSelectionStyle3D::SetMarkerRadius(const float radius)
-{
-  this->MarkerSource->SetRadius(radius);
 }
 
 void PointSelectionStyle3D::OnLeftButtonDown() 
@@ -74,7 +55,7 @@ void PointSelectionStyle3D::OnLeftButtonDown()
   double picked[3] = {0,0,0};
 
   vtkPointPicker::SafeDownCast(this->Interactor->GetPicker())->GetPickPosition(picked);
-  this->SelectedPointId = vtkPointPicker::SafeDownCast(this->Interactor->GetPicker())->GetPointId();
+  vtkIdType selectedId = vtkPointPicker::SafeDownCast(this->Interactor->GetPicker())->GetPointId();
   //std::cout << "Picked point with coordinate: " << picked[0] << " " << picked[1] << " " << picked[2] << std::endl;
 
   if(this->Interactor->GetShiftKey())
@@ -85,30 +66,11 @@ void PointSelectionStyle3D::OnLeftButtonDown()
   // Only select the point if control is held
   if(this->Interactor->GetControlKey())
     {
-    ChangePoint(this->SelectedPointId);
+    this->SelectedPointId = selectedId;
+    this->InvokeEvent(this->SelectedPointEvent, NULL);
     }
 
   // Forward events
   vtkInteractorStyleTrackballCamera::OnLeftButtonDown();
 
-}
-
-double* PointSelectionStyle3D::GetMarkerLocation()
-{
-  return this->MarkerSource->GetCenter();
-}
-
-void PointSelectionStyle3D::ChangePoint(const vtkIdType pointId)
-{
-  double p[3];
-  this->Points->GetPoint(pointId, p);
-  std::cout << "Changed point to: " << p[0] << " " << p[1] << " " << p[2] << std::endl;
-  this->MarkerSource->SetCenter(p);
-}
-
-void PointSelectionStyle3D::SetCurrentRenderer(vtkRenderer* const renderer)
-{
-  vtkInteractorStyle::SetCurrentRenderer(renderer);
-
-  renderer->AddViewProp( this->MarkerActor );
 }
